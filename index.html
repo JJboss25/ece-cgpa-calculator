@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECE CGPA Calculator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --pcb: #0f5132;
+    --pcb-dark: #0a3a24;
+    --pcb-soft: #e3efe8;
+    --copper: #b8743f;
+    --copper-soft: #f3e4d4;
+    --ink: #142019;
+    --bg: #eef2ef;
+    --card: #ffffff;
+    --line: #d7ddd9;
+    --muted: #5e6b64;
+    --text: #1c2622;
+    --danger: #a4402c;
+    --amber: #e2a63c;
+    --amber-soft: #fbead0;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); line-height: 1.4;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(15,81,50,.05) 0 1px, transparent 1px 28px),
+      repeating-linear-gradient(90deg, rgba(15,81,50,.05) 0 1px, transparent 1px 28px);
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  /* Header: engineering drawing sheet */
+  header { background: var(--pcb); color: #eef6f0; padding: 20px 16px 0; position: relative; }
+  .sheet { position: relative; border: 1px solid rgba(238,246,240,.35); padding: 18px 16px 16px; }
+  .sheet::before, .sheet::after,
+  .sheet > .tick-br, .sheet > .tick-bl { content: ""; position: absolute; width: 14px; height: 14px; }
+  .sheet::before { top: -1px; left: -1px; border-top: 2px solid #eef6f0; border-left: 2px solid #eef6f0; }
+  .sheet::after { top: -1px; right: -1px; border-top: 2px solid #eef6f0; border-right: 2px solid #eef6f0; }
+  .sheet > .tick-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #eef6f0; border-left: 2px solid #eef6f0; }
+  .sheet > .tick-br { bottom: -1px; right: -1px; border-bottom: 2px solid #eef6f0; border-right: 2px solid #eef6f0; }
+  header h1 { margin: 0 0 4px; font-family: var(--mono); font-size: 23px; font-weight: 600; letter-spacing: -0.01em; }
+  header p { margin: 0; color: #c9e3d3; font-size: 14px; }
+  .title-block { display: flex; margin-top: 14px; border-top: 1px solid rgba(238,246,240,.3); font-family: var(--mono); font-size: 11px; color: #bcdcc9; }
+  .title-block span { padding: 7px 12px 0; border-right: 1px solid rgba(238,246,240,.25); }
+  .title-block span:last-child { border-right: 0; }
+  .title-block b { color: #eef6f0; font-weight: 600; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .actions button {
+    flex: 1 1 0; min-width: 96px; font: inherit; font-size: 14px; color: #eef6f0; background: var(--pcb-dark);
+    border: 1px solid rgba(238,246,240,.25); padding: 11px 10px; cursor: pointer;
+  }
+  .actions button.danger { color: #f3cfc3; border-color: #7a3a2b; }
+  .actions button:hover { background: #062a1a; }
+
+  /* Summary */
+  .summary { position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--line); box-shadow: 0 1px 6px rgba(0,0,0,.05); }
+  .summary .wrap { padding: 12px 16px 12px; }
+  .cg-row { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cg-label { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .04em; }
+  .cg-bar { width: 36px; height: 3px; background: var(--copper); margin-bottom: 6px; }
+  .cg-value { font-size: 34px; font-weight: 700; color: var(--pcb); font-variant-numeric: tabular-nums; }
+  .cg-value.empty { font-size: 15px; font-weight: 400; color: var(--muted); }
+  .cg-class { font-size: 13px; color: var(--pcb-dark); background: var(--pcb-soft); border-radius: 3px; padding: 3px 10px; }
+  .stats { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .stats b { color: var(--text); font-size: 16px; margin-left: 4px; font-variant-numeric: tabular-nums; }
+
+  /* Panel */
+  main { padding: 16px; }
+  .panel { background: var(--card); border: 1px solid var(--line); padding: 16px; }
+  .panel > label.field { display: block; font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .03em; margin-bottom: 8px; }
+  .search { width: 100%; font: inherit; font-size: 16px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--text); }
+  .search:focus, select:focus, input:focus, button:focus-visible { outline: 2px solid var(--pcb); outline-offset: 1px; }
+  .check { display: flex; align-items: center; gap: 12px; margin-top: 14px; font-size: 15px; cursor: pointer; }
+  .check input { width: 22px; height: 22px; accent-color: var(--pcb); margin: 0; flex: none; }
+
+  .tabs { display: flex; gap: 8px; overflow-x: auto; margin-top: 16px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+  .tab { flex: none; font: inherit; font-size: 14px; padding: 9px 16px; border-radius: 3px; border: 1px solid var(--line); background: #fafbfa; color: var(--text); cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--pcb); border-color: var(--pcb); color: #fff; }
+
+  .select-wrap { position: relative; }
+  .select-wrap::after {
+    content: ""; position: absolute; right: 16px; top: 50%; width: 9px; height: 9px;
+    border-right: 2px solid var(--pcb); border-bottom: 2px solid var(--pcb);
+    transform: translateY(-65%) rotate(45deg); pointer-events: none;
+  }
+  .dropdown {
+    width: 100%; font: inherit; font-family: var(--mono); font-size: 16px; font-weight: 600; color: var(--ink);
+    background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 13px 40px 13px 14px;
+    appearance: none; -webkit-appearance: none; cursor: pointer;
+  }
+  .dropdown:focus { outline: 2px solid var(--pcb); outline-offset: 1px; }
+
+  /* Semester blocks */
+  .sem { margin-top: 20px; }
+  .sem-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 0 2px 8px; }
+  .sem-head h2 { margin: 0; font-family: var(--mono); font-weight: 600; font-size: 15px; }
+  .sem-head span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+  .list { background: var(--card); border: 1px solid var(--line); overflow: hidden; }
+  .course { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; padding: 16px; border-top: 1px solid var(--line); align-items: start; border-left: 3px solid transparent; }
+  .course:first-child { border-top: 0; }
+  .course.graded { border-left-color: var(--copper); }
+  .course.carried { background: var(--amber-soft); }
+  .co-badge { display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 600; letter-spacing: .03em; color: #8a5a00; background: var(--amber); border-radius: 3px; padding: 2px 7px; vertical-align: middle; margin-left: 4px; }
+  .co-check { margin-top: 10px; font-size: 14px; gap: 8px; }
+  .co-check input { width: 18px; height: 18px; }
+  .code { font-family: var(--mono); font-weight: 600; font-size: 18px; color: var(--ink); }
+  .title { color: #52605a; font-size: 15px; margin-top: 2px; }
+  .meta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-top: 8px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .meta b { color: var(--text); font-size: 15px; margin-left: 4px; font-variant-numeric: tabular-nums; font-family: var(--sans); }
+  select.grade { width: 100px; font: inherit; font-size: 19px; font-family: var(--mono); padding: 13px 8px; border: 1px solid var(--line); border-radius: 4px; background: #fff; color: var(--ink); cursor: pointer; }
+  .course.graded select.grade { border-color: var(--pcb); color: var(--pcb); font-weight: 700; }
+  .empty-msg { padding: 22px 16px; color: var(--muted); text-align: center; }
+
+  .scale { margin-top: 24px; font-size: 14px; color: var(--muted); }
+  .scale table { width: 100%; border-collapse: collapse; margin-top: 8px; background: #fff; border: 1px solid var(--line); overflow: hidden; }
+  .scale th, .scale td { padding: 8px 12px; text-align: left; border-bottom: 1px solid var(--line); font-size: 14px; }
+  .scale th { color: var(--muted); font-weight: 500; background: #fafbfa; font-family: var(--mono); font-size: 12px; }
+  .scale tr:last-child td { border-bottom: 0; }
+
+  .toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--pcb-dark); color: #fff; padding: 12px 18px; border-radius: 6px; font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 30; }
+  .toast.show { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+  /* Auth */
+  .account-bar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: var(--pcb-dark); color: #cfe6da; font-size: 13px; }
+  .account-bar span { font-family: var(--mono); }
+  .link-btn { font: inherit; font-size: 13px; color: #cfe6da; background: none; border: none; text-decoration: underline; cursor: pointer; padding: 0; margin-left: auto; }
+  .link-btn + .link-btn { margin-left: 14px; }
+  .auth-wrap { padding: 40px 16px; }
+  .auth-card { background: var(--card); border: 1px solid var(--line); padding: 20px; max-width: 420px; margin: 0 auto; }
+  .auth-card form .search { margin-bottom: 0; }
+  .auth-submit { width: 100%; font: inherit; font-size: 15px; font-weight: 600; color: #fff; background: var(--pcb); border: none; padding: 13px; border-radius: 4px; margin-top: 16px; cursor: pointer; }
+  .auth-submit:hover { background: var(--pcb-dark); }
+  .auth-error { margin-top: 12px; font-size: 14px; color: var(--danger); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap sheet">
+    <span class="tick-bl"></span><span class="tick-br"></span>
+    <h1>ECE CGPA CALCULATOR</h1>
+    <p>Department of Electronic Engineering</p>
+    <div class="title-block">
+      <span>DOC <b>CGPA-CALC</b></span>
+      <span>DEPT <b>ECE</b></span>
+      <span>REV <b>1.1</b></span>
+    </div>
+    <div class="actions">
+      <button id="btnExport" type="button">Export results</button>
+      <button id="btnReset" type="button" class="danger">Reset results</button>
+    </div>
+  </div>
+</header>
+
+<div id="authAccount" class="wrap account-bar" hidden>
+  <span id="accountName"></span>
+  <button id="btnLogout" type="button" class="link-btn">Log out</button>
+</div>
+
+<div id="authScreen" class="wrap auth-wrap" hidden>
+  <div class="auth-card">
+    <div class="sem-picker" role="tablist" style="margin-top:0">
+      <button class="sem-tab" type="button" id="tabLogin" aria-selected="true">Log in</button>
+      <button class="sem-tab" type="button" id="tabSignup" aria-selected="false">Sign up</button>
+    </div>
+
+    <form id="loginForm">
+      <label class="field" style="margin-top:16px">Email</label>
+      <input class="search" type="email" id="loginEmail" required autocomplete="email">
+      <label class="field" style="margin-top:12px">Password</label>
+      <input class="search" type="password" id="loginPassword" required autocomplete="current-password">
+      <button type="submit" class="auth-submit">Log in</button>
+    </form>
+
+    <form id="signupForm" hidden>
+      <label class="field" style="margin-top:16px">Username</label>
+      <input class="search" type="text" id="signupName" required autocomplete="name">
+      <label class="field" style="margin-top:12px">Email</label>
+      <input class="search" type="email" id="signupEmail" required autocomplete="email">
+      <label class="field" style="margin-top:12px">Password</label>
+      <input class="search" type="password" id="signupPassword" required minlength="6" autocomplete="new-password">
+      <button type="submit" class="auth-submit">Create account</button>
+    </form>
+
+    <div id="authError" class="auth-error" hidden></div>
+  </div>
+</div>
+
+<div id="appScreen">
+<section class="summary" aria-live="polite">
+  <div class="wrap">
+    <div class="cg-bar"></div>
+    <div class="cg-row">
+      <span class="cg-label">Current CGPA</span>
+      <span id="cgpa" class="cg-value empty">no results entered yet</span>
+      <span id="cgClass" class="cg-class" hidden></span>
+    </div>
+    <div class="stats">
+      <span>Graded courses<b id="sCourses">0</b></span>
+      <span>Units counted<b id="sUnits">0</b></span>
+      <span>Total quality points<b id="sQP">0</b></span>
+    </div>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="panel">
+    <label class="field" for="search">Find a course</label>
+    <input id="search" class="search" type="search" placeholder="e.g. ECE 311, circuit theory" autocomplete="off">
+    <label class="check"><input type="checkbox" id="onlyGraded"> Show only courses I have graded</label>
+    <label class="check"><input type="checkbox" id="fullPrecision"> Show full precision (5 d.p.)</label>
+    <label class="field" style="margin-top:16px">Select year</label>
+    <div class="select-wrap">
+      <select id="yearSelect" class="dropdown"></select>
+    </div>
+    <div id="semPicker"></div>
+  </div>
+
+  <div id="content"></div>
+
+  <div class="scale">
+    Grading scale
+    <table>
+      <tr><th>Score</th><th>Grade</th><th>Points</th></tr>
+      <tr><td>70 – 100</td><td>A</td><td>5</td></tr>
+      <tr><td>60 – 69</td><td>B</td><td>4</td></tr>
+      <tr><td>50 – 59</td><td>C</td><td>3</td></tr>
+      <tr><td>45 – 49</td><td>D</td><td>2</td></tr>
+      <tr><td>40 – 44</td><td>E</td><td>1</td></tr>
+      <tr><td>0 – 39</td><td>F</td><td>0</td></tr>
+    </table>
+    <p>CGPA = total quality points ÷ total units of graded courses. Quality points for a course = units × grade points. Courses you leave ungraded are ignored.</p>
+    <p><b>Carried over courses:</b> tick "Carried over" on a course you failed and are retaking. The earlier sitting is treated as an F (0 quality points), so the course's quality points become (units × new grade points) ÷ 2 — the retake averaged with that 0. Units still count once toward the total.</p>
+  </div>
+</main>
+</div>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  var GP = { A: 5, B: 4, C: 3, D: 2, E: 1, F: 0 };
+  var GRADES = ["A", "B", "C", "D", "E", "F"];
+  var STORE_KEY = "ece-cgpa-v1";
+
+  // [code, title, units]
+  var CURRICULUM = [
+    { level: 100, sem: 1, courses: [
+      ["MTH 111", "Elementary Mathematics I", 3],
+      ["MTH 121", "Elementary Mathematics II", 3],
+      ["ENGR 101", "Introduction to Engineering", 2],
+      ["CHM 101", "Basic Principles of Chemistry I", 2],
+      ["CHM 171", "Basic Practical Chemistry", 2],
+      ["GSP 101", "Use of English I", 2],
+      ["GSP 111", "Use of Library & Study Skills", 2],
+      ["PHY 121", "Fundamentals of Physics I", 3],
+      ["PHY 195", "Practical Physics II", 2],
+      ["ECE 101", "Introduction to Electronic Engineering", 2]
+    ]},
+    { level: 100, sem: 2, courses: [
+      ["CHM 112", "Basic Principles of Physical Chemistry", 2],
+      ["CHM 122", "Basic Principles of Organic Chemistry", 2],
+      ["ENGR 102", "Applied Mechanics", 3],
+      ["GSP 102", "Use of English II", 2],
+      ["MTH 122", "Elementary Mathematics III", 3],
+      ["PHY 116", "General Physics for Physical Sciences II", 2],
+      ["PHY 124", "Fundamentals of Physics III", 3],
+      ["ECE 103", "", 2]
+    ]},
+    { level: 200, sem: 1, courses: [
+      ["CVE 211", "Strength of Materials I", 2],
+      ["CVE 212", "Strength of Materials Laboratory", 1],
+      ["EEE 211", "Basic Electrical Engineering", 3],
+      ["ENGR 201", "Material Science", 2],
+      ["ENGR 202", "Material Science Laboratory", 1],
+      ["GSP 201", "Basic Concepts and Theories of Peace and Conflict", 2],
+      ["GSP 207", "Logic, Philosophy and Human Existence", 2],
+      ["MEE 211", "Engineering Drawing I", 2],
+      ["ME 261", "Thermodynamics and Heat Engines", 2],
+      ["MTH 207", "Advanced Mathematics", 2]
+    ]},
+    { level: 200, sem: 2, courses: [
+      ["CVE 221", "Fluid Mechanics I", 2],
+      ["ECE 272", "Engineering Computer Programming", 3],
+      ["EE 251", "Basic Electrical Engineering Laboratory/Practice", 1],
+      ["ECE 262", "Engineering Computer Programming Laboratory", 1],
+      ["MTH 208", "Advanced Mathematics VIII", 2],
+      ["MTH 206", "Advanced Mathematics VI", 2],
+      ["GSP 208", "Nigerian Peoples and Cultures", 2],
+      ["GSP 202", "Peace and Conflict Resolution II", 2],
+      ["CE 222", "Fluid Mechanics Laboratory", 1],
+      ["ME 212", "Workshop Technology", 2]
+    ]},
+    { level: 300, sem: 1, courses: [
+      ["CED 341", "Introduction to Entrepreneurship", 2],
+      ["EEE 351", "Electrical Machines Laboratory", 1],
+      ["ECE 321", "Physical Electronics", 3],
+      ["ECE 311", "Circuit Theory I", 3],
+      ["ECE 331", "Electromagnetic Fields & Waves I", 3],
+      ["ECE 361", "Electronic Measurements", 2],
+      ["STA 205", "Statistics for Physical Sciences & Engr. I", 2],
+      ["ECE 371", "System Programming", 2],
+      ["EE 361", "Electrical Machines I", 3],
+      ["ECE 363", "Physical and Electronic Laboratory", 1]
+    ]},
+    { level: 300, sem: 2, courses: [
+      ["CED 342", "Business Development & Management", 2],
+      ["ENGR 301", "Engineering Analysis", 4],
+      ["ECE 322", "Applied Electronics I", 2],
+      ["ECE 362", "Applied Electronics Laboratory", 1],
+      ["ECE 312", "Circuit Theory II", 3],
+      ["ECE 332", "Electromagnetic Fields & Waves II", 3],
+      ["ECE 364", "Measurements & Instrumentation Lab.", 1],
+      ["EEE 332", "Electric Power Systems Principles", 3],
+      ["EE 352", "Electric Power Systems Lab.", 1]
+    ]}
+  ];
+
+  // Flatten
+  var ALL = [];
+  CURRICULUM.forEach(function (blk) {
+    blk.courses.forEach(function (c) {
+      ALL.push({ code: c[0], title: c[1], defUnits: c[2], level: blk.level, sem: blk.sem });
+    });
+  });
+  var LEVELS = [100, 200, 300];
+
+  // State
+  var state = { grades: {}, carried: {} };
+  var ui = { year: 100, sem: 1, query: "", onlyGraded: false, full: false };
+
+  // Storage (falls back silently if unavailable)
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+  function load() {
+    try {
+      var raw = localStorage.getItem(STORE_KEY);
+      if (raw) applyData(JSON.parse(raw));
+    } catch (e) {}
+  }
+  function applyData(d) {
+    var g = {}, co = {};
+    var byCode = {};
+    ALL.forEach(function (c) { byCode[c.code] = c; });
+    if (d && d.grades) Object.keys(d.grades).forEach(function (k) {
+      if (byCode[k] && GP.hasOwnProperty(d.grades[k])) g[k] = d.grades[k];
+    });
+    if (d && d.carried) Object.keys(d.carried).forEach(function (k) {
+      if (byCode[k] && d.carried[k]) co[k] = true;
+    });
+    state.grades = g; state.carried = co;
+  }
+
+  function unitsOf(c) { return c.defUnits; }
+
+  // A carried-over (repeated) course means the earlier sitting was an F (0 quality points).
+  // The retake's quality points are averaged with that 0, per the carryover policy.
+  function coursePoints(c) {
+    var g = state.grades[c.code];
+    if (!g) return null;
+    var u = unitsOf(c);
+    var full = u * GP[g];
+    return state.carried[c.code] ? full / 2 : full;
+  }
+
+  // Calculation
+  function calc(list) {
+    var units = 0, qp = 0, n = 0;
+    list.forEach(function (c) {
+      var g = state.grades[c.code];
+      if (!g) return;
+      var u = unitsOf(c);
+      if (u <= 0) return;
+      n++; units += u; qp += coursePoints(c);
+    });
+    return { n: n, units: units, qp: qp, gpa: units > 0 ? qp / units : null };
+  }
+  function fmt(x) { return x.toFixed(ui.full ? 5 : 2); }
+
+  function degreeClass(x) {
+    if (x >= 4.5) return "First Class";
+    if (x >= 3.5) return "Second Class Upper";
+    if (x >= 2.4) return "Second Class Lower";
+    if (x >= 1.5) return "Third Class";
+    if (x >= 1.0) return "Pass";
+    return "Below pass";
+  }
+
+  // Rendering
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (m) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]; }); }
+
+  function renderSummary() {
+    var t = calc(ALL);
+    var el = document.getElementById("cgpa");
+    var cls = document.getElementById("cgClass");
+    if (t.gpa === null) {
+      el.textContent = "no results entered yet"; el.className = "cg-value empty"; cls.hidden = true;
+    } else {
+      el.textContent = fmt(t.gpa); el.className = "cg-value";
+      cls.textContent = degreeClass(t.gpa); cls.hidden = false;
+    }
+    document.getElementById("sCourses").textContent = t.n;
+    document.getElementById("sUnits").textContent = t.units;
+    document.getElementById("sQP").textContent = t.qp;
+  }
+
+  var LEVEL_OPTIONS = [100, 200, 300, 400, 500];
+
+  function renderTabs() {
+    var yearSel = document.getElementById("yearSelect");
+    yearSel.innerHTML = LEVEL_OPTIONS.map(function (l) {
+      return '<option value="' + l + '"' + (ui.year === l ? " selected" : "") + ">" + l + " Level</option>";
+    }).join("");
+
+    var semHost = document.getElementById("semPicker");
+    if (ui.query) { semHost.innerHTML = ""; return; }
+    semHost.innerHTML =
+      '<label class="field" style="margin-top:16px">Select semester</label>' +
+      '<div class="select-wrap">' +
+        '<select id="semSelect" class="dropdown">' +
+          '<option value="1"' + (ui.sem === 1 ? " selected" : "") + ">First semester</option>" +
+          '<option value="2"' + (ui.sem === 2 ? " selected" : "") + ">Second semester</option>" +
+        "</select>" +
+      "</div>";
+    document.getElementById("semSelect").addEventListener("change", function (e) {
+      ui.sem = Number(e.target.value); renderTabs(); renderContent();
+    });
+  }
+
+  function courseHTML(c) {
+    var g = state.grades[c.code] || "";
+    var u = unitsOf(c);
+    var gp = g ? GP[g] : null;
+    var carried = !!state.carried[c.code];
+    var pts = g ? coursePoints(c) : null;
+    var opts = '<option value="">—</option>' + GRADES.map(function (x) {
+      return '<option value="' + x + '"' + (x === g ? " selected" : "") + ">" + x + "</option>";
+    }).join("");
+    return '<div class="course' + (g ? " graded" : "") + (carried ? " carried" : "") + '">' +
+      "<div>" +
+        '<div class="code">' + esc(c.code) + (carried ? ' <span class="co-badge">carried over</span>' : "") + "</div>" +
+        (c.title ? '<div class="title">' + esc(c.title) + "</div>" : "") +
+        '<div class="meta">' +
+          "<span>Units<b>" + u + "</b></span>" +
+          "<span>Grade pt<b>" + (gp === null ? "—" : gp) + "</b></span>" +
+          "<span>Course pt<b>" + (pts === null ? "—" : trimNum(pts)) + "</b></span>" +
+        "</div>" +
+        '<label class="check co-check"><input type="checkbox" data-carried="' + esc(c.code) + '"' + (carried ? " checked" : "") + "> Carried over (new grade after an earlier F)</label>" +
+      "</div>" +
+      '<select class="grade" data-grade="' + esc(c.code) + '" aria-label="Grade for ' + esc(c.code) + '">' + opts + "</select>" +
+    "</div>";
+  }
+  function trimNum(x) { return (Math.round(x * 100) / 100).toString(); }
+
+  function semBlock(title, list) {
+    var t = calc(list);
+    var stat = t.gpa === null ? "no grades yet" : "GPA " + fmt(t.gpa) + " · " + t.units + " units graded";
+    return '<section class="sem"><div class="sem-head"><h2>' + esc(title) + "</h2><span>" + stat + '</span></div><div class="list">' +
+      list.map(courseHTML).join("") + "</div></section>";
+  }
+
+  function visible(c) {
+    if (ui.query) {
+      var q = ui.query.toLowerCase().replace(/\s+/g, " ");
+      var hay = (c.code + " " + c.title).toLowerCase();
+      var hayNoSpace = hay.replace(/\s+/g, "");
+      if (hay.indexOf(q) === -1 && hayNoSpace.indexOf(q.replace(/\s+/g, "")) === -1) return false;
+    }
+    if (ui.onlyGraded && !state.grades[c.code]) return false;
+    return true;
+  }
+
+  function renderContent() {
+    var host = document.getElementById("content");
+    var html = "";
+    var searching = !!ui.query;
+
+    if (searching) {
+      // Search looks across every year and semester, grouped as usual
+      LEVELS.forEach(function (l) {
+        [1, 2].forEach(function (s) {
+          var list = ALL.filter(function (c) { return c.level === l && c.sem === s && visible(c); });
+          if (!list.length) return;
+          var full = ALL.filter(function (c) { return c.level === l && c.sem === s; });
+          var title = l + " Level · " + (s === 1 ? "First" : "Second") + " semester";
+          html += semBlockWithFull(title, list, full);
+        });
+      });
+    } else {
+      // Normal browsing: just the selected year + semester
+      var full2 = ALL.filter(function (c) { return c.level === ui.year && c.sem === ui.sem; });
+      if (!full2.length) {
+        host.innerHTML = '<div class="list" style="margin-top:20px"><div class="empty-msg">No courses added yet.</div></div>';
+        return;
+      }
+      var list2 = full2.filter(visible);
+      var title2 = ui.year + " Level · " + (ui.sem === 1 ? "First" : "Second") + " semester";
+      if (list2.length) html += semBlockWithFull(title2, list2, full2);
+    }
+
+    if (!html) {
+      html = '<div class="list" style="margin-top:20px"><div class="empty-msg">' +
+        (ui.onlyGraded && !searching ? "You haven't graded any courses here yet. Untick “Show only courses I have graded” to add grades." : "No courses match your search.") +
+        "</div></div>";
+    }
+    host.innerHTML = html;
+  }
+
+  function semBlockWithFull(title, list, full) {
+    var t = calc(full);
+    var stat = t.gpa === null ? "no grades yet" : "GPA " + fmt(t.gpa) + " · " + t.units + " units graded";
+    return '<section class="sem"><div class="sem-head"><h2>' + esc(title) + "</h2><span>" + stat + '</span></div><div class="list">' +
+      list.map(courseHTML).join("") + "</div></section>";
+  }
+
+  function renderAll() { renderSummary(); renderTabs(); renderContent(); }
+
+  // Toast
+  var toastTimer;
+  function toast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
+  }
+
+  // Events
+  document.getElementById("content").addEventListener("change", function (e) {
+    var g = e.target.getAttribute("data-grade");
+    var co = e.target.getAttribute("data-carried");
+    if (g) {
+      if (e.target.value) state.grades[g] = e.target.value; else delete state.grades[g];
+      save(); renderSummary(); renderContent();
+    } else if (co) {
+      if (e.target.checked) state.carried[co] = true; else delete state.carried[co];
+      save(); renderSummary(); renderContent();
+    }
+  });
+
+  document.getElementById("yearSelect").addEventListener("change", function (e) {
+    ui.year = Number(e.target.value); renderTabs(); renderContent();
+  });
+  // semSelect's own change listener is attached inside renderTabs(), since
+  // the element is rebuilt there each time.
+
+  document.getElementById("search").addEventListener("input", function (e) {
+    ui.query = e.target.value.trim(); renderTabs(); renderContent();
+  });
+  document.getElementById("onlyGraded").addEventListener("change", function (e) {
+    ui.onlyGraded = e.target.checked; renderContent();
+  });
+  document.getElementById("fullPrecision").addEventListener("change", function (e) {
+    ui.full = e.target.checked; renderSummary(); renderContent();
+  });
+
+  document.getElementById("btnExport").addEventListener("click", function () {
+    var data = JSON.stringify({ app: "ece-cgpa", version: 1, grades: state.grades, carried: state.carried }, null, 2);
+    var blob = new Blob([data], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "ece-cgpa-results.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+    toast("Results exported");
+  });
+
+  document.getElementById("btnReset").addEventListener("click", function () {
+    if (!Object.keys(state.grades).length && !Object.keys(state.carried).length) { toast("Nothing to reset"); return; }
+    if (confirm("Clear all grades? This can't be undone.")) {
+      state = { grades: {}, carried: {} };
+      save(); renderAll(); toast("Results reset");
+    }
+  });
+
+  load();
+  renderAll();
+})();
+</script>
+
+<!--
+  Login is temporarily paused until Firebase is configured with real keys
+  (see the YOUR_API_KEY placeholder below). Unwrap this script tag once you've
+  sent those keys and I've filled them in — the calculator works openly for now.
+
+<script type="module">
+  import {
+    initializeApp
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+  import {
+    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+    updateProfile, onAuthStateChanged, signOut
+  } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+  // ---- 1) Paste your Firebase project's config here (Firebase Console > Project settings > Your apps) ----
+  var firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+    projectId: "YOUR_PROJECT_ID",
+    appId: "YOUR_APP_ID"
+  };
+  // -----------------------------------------------------------------------------------------------------
+
+  var app = initializeApp(firebaseConfig);
+  var auth = getAuth(app);
+
+  function el(id) { return document.getElementById(id); }
+  function showAuthError(msg) { el("authError").textContent = msg; el("authError").hidden = false; }
+  function clearAuthError() { el("authError").hidden = true; }
+
+  function friendlyError(err) {
+    var m = {
+      "auth/email-already-in-use": "That email is already registered — try logging in instead.",
+      "auth/invalid-email": "That email address doesn't look right.",
+      "auth/weak-password": "Password should be at least 6 characters.",
+      "auth/wrong-password": "Incorrect password.",
+      "auth/invalid-credential": "Incorrect email or password.",
+      "auth/user-not-found": "No account found with that email."
+    };
+    return m[err.code] || (err.message || "Something went wrong — try again.");
+  }
+
+  // Screen switching
+  function showScreen(name) {
+    el("authAccount").hidden = name !== "app";
+    el("authScreen").hidden = name !== "login";
+    el("appScreen").hidden = name !== "app";
+  }
+
+  el("tabLogin").addEventListener("click", function () {
+    el("tabLogin").setAttribute("aria-selected", "true");
+    el("tabSignup").setAttribute("aria-selected", "false");
+    el("loginForm").hidden = false; el("signupForm").hidden = true;
+    clearAuthError();
+  });
+  el("tabSignup").addEventListener("click", function () {
+    el("tabSignup").setAttribute("aria-selected", "true");
+    el("tabLogin").setAttribute("aria-selected", "false");
+    el("signupForm").hidden = false; el("loginForm").hidden = true;
+    clearAuthError();
+  });
+
+  el("signupForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    clearAuthError();
+    var name = el("signupName").value.trim();
+    var email = el("signupEmail").value.trim();
+    var password = el("signupPassword").value;
+    createUserWithEmailAndPassword(auth, email, password)
+      .then(function (cred) { return updateProfile(cred.user, { displayName: name }); })
+      .catch(function (err) { showAuthError(friendlyError(err)); });
+  });
+
+  el("loginForm").addEventListener("submit", function (e) {
+    e.preventDefault();
+    clearAuthError();
+    var email = el("loginEmail").value.trim();
+    var password = el("loginPassword").value;
+    signInWithEmailAndPassword(auth, email, password)
+      .catch(function (err) { showAuthError(friendlyError(err)); });
+  });
+
+  el("btnLogout").addEventListener("click", function () { signOut(auth); });
+
+  onAuthStateChanged(auth, function (user) {
+    if (user) {
+      el("accountName").textContent = user.displayName || user.email;
+      showScreen("app");
+    } else {
+      showScreen("login");
+    }
+  });
+</script>
+-->
+</body>
+</html>
